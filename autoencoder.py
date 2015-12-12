@@ -45,6 +45,7 @@ def main():
     encoder_inputs, decoder_inputs, decoder_outputs, decoder_loss = \
         _create_model(input_size, args)
     optimizer = tf.train.AdamOptimizer()
+    # TODO - monitor gradient norms, clip them?
     train_op = optimizer.minimize(decoder_loss)
     saver = tf.train.Saver(tf.all_variables())
 
@@ -169,9 +170,8 @@ def _prepare_batch(inputs, input_size, max_seq_length,
          for _ in xrange(max_seq_length)] for _ in xrange(2)]
     for n_batch, input_ in enumerate(inputs):
         n_pad = (max_seq_length - len(input_))
-        padded_input = list(input_) + [PAD_ID] * n_pad
-        if reverse:
-            padded_input.reverse()
+        padded_input = [PAD_ID] * n_pad + list(
+            reversed(input_) if reverse else input_)
         for values, seq in [
                 (batch_inputs, [padded_input]),
                 (batch_outputs, [[GO_ID], input_ , repeat(PAD_ID, n_pad - 1)])

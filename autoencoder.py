@@ -165,7 +165,6 @@ def _read_inputs(args):
             if len(string) > limit:
                 string = string[:limit - 1].rsplit(None, 1)[0] + ' '
             if len(string) <= limit:
-                print string
                 inputs.append([char_to_id.get(ch, UNK_D) for ch in string])
     return inputs, char_to_id
 

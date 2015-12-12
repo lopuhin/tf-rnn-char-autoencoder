@@ -67,7 +67,6 @@ def _create_model(input_size, args):
             ('decoder', args.max_seq_length)]]
     decoder_outputs, _ = seq2seq.tied_rnn_seq2seq(
         encoder_inputs, decoder_inputs, cell)
-    params = tf.trainable_variables()
     # TODO - add weights
     targets = decoder_inputs[1:]
     decoder_loss = tf.reduce_mean(tf.add_n([

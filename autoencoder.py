@@ -5,6 +5,7 @@ import re
 import codecs
 import argparse
 import random
+import time
 from itertools import chain, repeat, izip
 from collections import Counter
 
@@ -51,6 +52,7 @@ def main():
         else:
             sess.run(tf.initialize_all_variables())
         losses = []
+        t0 = time.time()
         for step in xrange(args.n_steps):
             feed_dict = {}
             b_inputs = [random.choice(inputs) for _ in xrange(args.batch_size)]
@@ -64,8 +66,10 @@ def main():
             _, loss = sess.run([train_op, decoder_loss], feed_dict)
             losses.append(loss)
             if step % args.report_step == 1:
-                print '{}: {}'.format(
-                    int(step / args.report_step), np.mean(losses))
+                print '{:>3}: loss {:.3f} in {} s'.format(
+                    int(step / args.report_step),
+                    np.mean(losses),
+                    int(time.time() - t0))
                 losses = []
                 if args.save:
                     saver.save(sess, args.save, global_step=step)

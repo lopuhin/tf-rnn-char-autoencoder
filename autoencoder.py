@@ -29,8 +29,10 @@ def main():
     arg('--min-char-count', type=int, default=100)
     arg('--reverse', action='store_true', help='reverse input')
     arg('--words', action='store_true', help='encode only single words')
+    arg('--load')
+    arg('--save')
     args = parser.parse_args()
-    print 'reading inputs'
+    print args
     inputs, char_to_id = _read_inputs(
         args.filename, args.max_seq_length,
         words=args.words, min_char_count=args.min_char_count)
@@ -41,8 +43,13 @@ def main():
         _create_model(input_size, args)
     optimizer = tf.train.AdamOptimizer()
     train_op = optimizer.minimize(decoder_loss)
+    saver = tf.train.Saver(tf.all_variables())
+
     with tf.Session() as sess:
-        sess.run(tf.initialize_all_variables())
+        if args.load:
+            saver.restore(sess, args.load)
+        else:
+            sess.run(tf.initialize_all_variables())
         losses = []
         for step in xrange(args.n_steps):
             feed_dict = {}
@@ -60,6 +67,8 @@ def main():
                 print '{}: {}'.format(
                     int(step / args.report_step), np.mean(losses))
                 losses = []
+                if args.save:
+                    saver.save(sess, args.save, global_step=step)
 
 
 def _create_model(input_size, args):

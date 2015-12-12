@@ -35,6 +35,7 @@ def main():
     train_op = optimizer.minimize(decoder_loss)
     with tf.Session() as sess:
         sess.run(tf.initialize_all_variables())
+        losses = []
         for step in xrange(args.n_steps):
             feed_dict = {}
             batch_inputs, batch_outputs = _prepare_batch(
@@ -44,8 +45,10 @@ def main():
                 chain(izip(encoder_inputs, batch_inputs),
                       izip(decoder_inputs, batch_outputs))}
             _, loss = sess.run([train_op, decoder_loss], feed_dict)
+            losses.append(loss)
             if step % 100 == 1:
-                print step, loss
+                print step, np.mean(losses)
+                losses = []
 
 
 def _create_model(input_size, args):

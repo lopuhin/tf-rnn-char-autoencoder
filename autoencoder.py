@@ -23,6 +23,7 @@ def main():
     arg('--batch_size', type=int, default=32)
     arg('--max_seq_length', type=int, default=20)  # TODO - buckets?
     arg('--n-steps', type=int, default=10000)
+    arg('--report-step', type=int, default=100)
     args = parser.parse_args()
     print 'reading inputs'
     inputs, char_to_id = _read_inputs(args.filename, args.max_seq_length)
@@ -46,8 +47,9 @@ def main():
                       izip(decoder_inputs, batch_outputs))}
             _, loss = sess.run([train_op, decoder_loss], feed_dict)
             losses.append(loss)
-            if step % 100 == 1:
-                print step, np.mean(losses)
+            if step % args.report_step == 1:
+                print '{}: {}'.format(
+                    int(step / args.report_step), np.mean(losses))
                 losses = []
 
 

@@ -74,6 +74,7 @@ def _create_model(input_size, args):
         encoder_inputs, decoder_inputs, cell)
     # TODO - add weights
     targets = decoder_inputs[1:]
+    # TODO - this scaling by max_seq_length does not take padding into account
     decoder_loss = (1. / args.max_seq_length) * tf.reduce_mean(tf.add_n([
         tf.nn.softmax_cross_entropy_with_logits(
             logits, target, name='seq_loss_{}'.format(i))

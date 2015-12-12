@@ -9,8 +9,6 @@ words with reverse (061e6b0ce3ed1129cd437af6b6b2653277a9cd2d)::
         --n-steps=10000 --reverse --words --max-seq-length=12
     Namespace(batch_size=32, filename='/Users/kostia/programming/ling/corpora/opencorpora.txt', max_seq_length=12, min_char_count=100, n_steps=10000, report_step=100, reverse=True, state_size=100, words=True)
     input_size 158
-    I tensorflow/core/common_runtime/local_device.cc:40] Local device intra op parallelism threads: 4
-    I tensorflow/core/common_runtime/direct_session.cc:60] Direct session inter op parallelism threads: 4
     0: 4.5964474678
     1: 2.42313051224
     2: 1.8466616869

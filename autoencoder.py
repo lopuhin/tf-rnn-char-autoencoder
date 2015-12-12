@@ -8,6 +8,7 @@ import random
 import time
 from itertools import chain, repeat, izip
 from collections import Counter
+import cPickle as pickle
 
 import numpy as np
 import tensorflow as tf
@@ -30,13 +31,12 @@ def main():
     arg('--min-char-count', type=int, default=100)
     arg('--reverse', action='store_true', help='reverse input')
     arg('--words', action='store_true', help='encode only single words')
-    arg('--load')
-    arg('--save')
+    arg('--load', help='restore model from given file')
+    arg('--save', help='save model to given file (plus step number)')
+    arg('--predict', action='store_true')
     args = parser.parse_args()
     print args
-    inputs, char_to_id = _read_inputs(
-        args.filename, args.max_seq_length,
-        words=args.words, min_char_count=args.min_char_count)
+    inputs, char_to_id = _read_inputs(args)
     input_size = len(char_to_id) + len(_RESERVED)
     print 'input_size', input_size
 
@@ -51,28 +51,52 @@ def main():
             saver.restore(sess, args.load)
         else:
             sess.run(tf.initialize_all_variables())
-        losses = []
-        t0 = time.time()
-        for step in xrange(args.n_steps):
-            feed_dict = {}
-            b_inputs = [random.choice(inputs) for _ in xrange(args.batch_size)]
-            batch_inputs, batch_outputs = _prepare_batch(
-                b_inputs, input_size, args.max_seq_length,
-                reverse=args.reverse)
-            feed_dict = {
-                var.name: val for var, val in
-                chain(izip(encoder_inputs, batch_inputs),
-                      izip(decoder_inputs, batch_outputs))}
-            _, loss = sess.run([train_op, decoder_loss], feed_dict)
-            losses.append(loss)
-            if step % args.report_step == 1:
-                print '{:>3}: loss {:.3f} in {} s'.format(
-                    int(step / args.report_step),
-                    np.mean(losses),
-                    int(time.time() - t0))
-                losses = []
-                if args.save:
-                    saver.save(sess, args.save, global_step=step)
+        if args.predict:
+            id_to_char = {id_: ch for ch, id_ in char_to_id.iteritems()}
+            for id_ in _RESERVED:
+                id_to_char[id_] = ''
+            for batch in chunks(inputs, args.batch_size):
+                feed_dict = _prepare_batch(
+                    batch, input_size, args.max_seq_length,
+                    encoder_inputs, decoder_inputs, reverse=args.reverse)
+                outputs = sess.run(decoder_outputs, feed_dict)
+                input_lines = [[id_to_char[id_] for id_ in line]
+                               for line in batch]
+                output_lines = [[] for _ in xrange(args.batch_size)]
+                for char_block in outputs:
+                    for i, id_ in enumerate(np.argmax(char_block, axis=1)):
+                        output_lines[i].append(id_to_char[id_])
+                for inp, out in zip(input_lines, output_lines):
+                    print
+                    print ''.join(inp)
+                    print ''.join(out)
+                import pdb; pdb.set_trace()
+        else:
+            _train(inputs, input_size, args, sess, saver,
+                encoder_inputs, decoder_inputs, train_op, decoder_loss)
+
+
+
+def _train(inputs, input_size, args, sess, saver,
+        encoder_inputs, decoder_inputs, train_op, decoder_loss):
+    losses = []
+    t0 = time.time()
+    for step in xrange(args.n_steps):
+        feed_dict = {}
+        b_inputs = [random.choice(inputs) for _ in xrange(args.batch_size)]
+        feed_dict = _prepare_batch(
+            b_inputs, input_size, args.max_seq_length,
+            encoder_inputs, decoder_inputs, reverse=args.reverse)
+        _, loss = sess.run([train_op, decoder_loss], feed_dict)
+        losses.append(loss)
+        if step % args.report_step == 1:
+            print '{:>3}: loss {:.3f} in {} s'.format(
+                int(step / args.report_step),
+                np.mean(losses),
+                int(time.time() - t0))
+            losses = []
+            if args.save:
+                saver.save(sess, args.save, global_step=step)
 
 
 def _create_model(input_size, args):
@@ -83,8 +107,9 @@ def _create_model(input_size, args):
         for i in xrange(length)] for name, length in [
             ('encoder', args.max_seq_length),
             ('decoder', args.max_seq_length)]]
+    loop_function = (lambda prev, _: prev) if args.predict else None
     decoder_outputs, _ = seq2seq.tied_rnn_seq2seq(
-        encoder_inputs, decoder_inputs, cell)
+        encoder_inputs, decoder_inputs, cell, loop_function=loop_function)
     # TODO - add weights
     targets = decoder_inputs[1:]
     # TODO - this scaling by max_seq_length does not take padding into account
@@ -95,26 +120,33 @@ def _create_model(input_size, args):
     return encoder_inputs, decoder_inputs, decoder_outputs, decoder_loss
 
 
-def _read_inputs(filename, max_seq_length, words, min_char_count):
+def _read_inputs(args):
     ''' Return a list of inputs (int lists), and an encoding dict.
     '''
     word_re = re.compile(r'\w+', re.U)
     inputs = []
-    with codecs.open(filename, 'rb', 'utf-8') as f:
-        char_counts = Counter(ch for line in f for ch in line)
-        char_to_id = {
-            ch: id_ for id_, ch in enumerate(
-                (ch for ch, count in char_counts.iteritems()
-                    if count >= min_char_count),
-                len(_RESERVED))}
-        f.seek(0)
-        for line in f:
-            if words:
+    with codecs.open(args.filename, 'rb', 'utf-8') as textfile:
+        if args.load:
+            with open(args.load.rsplit('-', 1)[0] + '.mapping', 'rb') as f:
+                char_to_id = pickle.load(f)
+        else:
+            char_counts = Counter(ch for line in textfile for ch in line)
+            char_to_id = {
+                ch: id_ for id_, ch in enumerate(
+                    (ch for ch, count in char_counts.iteritems()
+                        if count >= args.min_char_count),
+                    len(_RESERVED))}
+            textfile.seek(0)
+        if args.save:
+            with open(args.save + '.mapping', 'wb') as f:
+                pickle.dump(char_to_id, f, protocol=-1)
+        for line in textfile:
+            if args.words:
                 for word in word_re.findall(line):
-                    if len(word) < max_seq_length:  # one more for "GO"
+                    if len(word) < args.max_seq_length:  # one more for "GO"
                         inputs.append(_encode(word, char_to_id))
             else:
-                if len(line) < max_seq_length:
+                if len(line) < args.max_seq_length:  # one more for "GO"
                     inputs.append(_encode(line, char_to_id))
     return inputs, char_to_id
 
@@ -123,7 +155,8 @@ def _encode(string, char_to_id):
     return [char_to_id.get(ch, UNK_D) for ch in string]
 
 
-def _prepare_batch(inputs, input_size, max_seq_length, reverse=False):
+def _prepare_batch(inputs, input_size, max_seq_length,
+        encoder_inputs, decoder_inputs, reverse=False):
     ''' Prepare batch for training: return batch_inputs and batch_outputs,
     where each is a list of float32 arrays of shape (batch_size, input_size),
     adding padding and "GO" symbol.
@@ -143,7 +176,16 @@ def _prepare_batch(inputs, input_size, max_seq_length, reverse=False):
                 ]:
             for i, id_ in enumerate(chain(*seq)):
                 values[i][n_batch][id_] = 1.0
-    return batch_inputs, batch_outputs
+    feed_dict = {
+        var.name: val for var, val in
+        chain(izip(encoder_inputs, batch_inputs),
+              izip(decoder_inputs, batch_outputs))}
+    return feed_dict
+
+
+def chunks(lst, n):
+    for i in xrange(0, len(lst), n):
+        yield lst[i:i+n]
 
 
 if __name__ == '__main__':

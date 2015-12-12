@@ -24,6 +24,7 @@ def main():
     arg('--max_seq_length', type=int, default=20)  # TODO - buckets?
     arg('--n-steps', type=int, default=10000)
     arg('--report-step', type=int, default=100)
+    arg('--reverse', action='store_true', help='reverse input')
     args = parser.parse_args()
     print 'reading inputs'
     inputs, char_to_id = _read_inputs(args.filename, args.max_seq_length)
@@ -41,7 +42,8 @@ def main():
             feed_dict = {}
             b_inputs = [random.choice(inputs) for _ in xrange(args.batch_size)]
             batch_inputs, batch_outputs = _prepare_batch(
-                b_inputs, input_size, args.max_seq_length)
+                b_inputs, input_size, args.max_seq_length,
+                reverse=args.reverse)
             feed_dict = {
                 var.name: val for var, val in
                 chain(izip(encoder_inputs, batch_inputs),
@@ -101,7 +103,7 @@ def _encode(string, char_to_id):
     return result
 
 
-def _prepare_batch(inputs, input_size, max_seq_length):
+def _prepare_batch(inputs, input_size, max_seq_length, reverse=False):
     ''' Prepare batch for training: return batch_inputs and batch_outputs,
     where each is a list of float32 arrays of shape (batch_size, input_size),
     adding padding and "GO" symbol.
@@ -112,9 +114,11 @@ def _prepare_batch(inputs, input_size, max_seq_length):
          for _ in xrange(max_seq_length)] for _ in xrange(2)]
     for n_batch, input_ in enumerate(inputs):
         n_pad = (max_seq_length - len(input_))
+        padded_input = list(input_) + [PAD_ID] * n_pad
+        if reverse:
+            padded_input.reverse()
         for values, seq in [
-                # TODO - reverse inputs?
-                (batch_inputs, [input_, repeat(PAD_ID, n_pad)]),
+                (batch_inputs, [padded_input]),
                 (batch_outputs, [[GO_ID], input_ , repeat(PAD_ID, n_pad - 1)])
                 ]:
             for i, id_ in enumerate(chain(*seq)):

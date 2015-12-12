@@ -14,6 +14,8 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.models.rnn import seq2seq, rnn_cell
 
+from utils import chunks
+
 
 PAD_ID, GO_ID, UNK_D = _RESERVED = range(3)
 
@@ -23,8 +25,8 @@ def main():
     parser = argparse.ArgumentParser()
     arg = parser.add_argument
     arg('filename')
-    arg('--state_size', type=int, default=100)
-    arg('--batch_size', type=int, default=32)
+    arg('--state-size', type=int, default=100)
+    arg('--batch-size', type=int, default=64)
     arg('--max-seq-length', type=int, default=100)  # TODO - buckets?
     arg('--n-steps', type=int, default=10000)
     arg('--report-step', type=int, default=100)
@@ -79,9 +81,7 @@ def main():
 
 def _train(inputs, input_size, args, sess, saver,
         encoder_inputs, decoder_inputs, train_op, decoder_loss):
-    losses = []
-    t0 = time.time()
-    for step in xrange(args.n_steps):
+    def _step(step):
         feed_dict = {}
         b_inputs = [random.choice(inputs) for _ in xrange(args.batch_size)]
         feed_dict = _prepare_batch(
@@ -94,9 +94,13 @@ def _train(inputs, input_size, args, sess, saver,
                 int(step / args.report_step),
                 np.mean(losses),
                 int(time.time() - t0))
-            losses = []
+            losses[:] = []
             if args.save:
                 saver.save(sess, args.save, global_step=step)
+    losses = []
+    t0 = time.time()
+    for n in xrange(args.n_steps):
+        _step(n)
 
 
 def _create_model(input_size, args):
@@ -143,6 +147,7 @@ def _read_inputs(args):
         for line in textfile:
             if args.words:
                 for word in word_re.findall(line):
+                    word = word + ' '
                     if len(word) < args.max_seq_length:  # one more for "GO"
                         inputs.append(_encode(word, char_to_id))
             else:
@@ -181,11 +186,6 @@ def _prepare_batch(inputs, input_size, max_seq_length,
         chain(izip(encoder_inputs, batch_inputs),
               izip(decoder_inputs, batch_outputs))}
     return feed_dict
-
-
-def chunks(lst, n):
-    for i in xrange(0, len(lst), n):
-        yield lst[i:i+n]
 
 
 if __name__ == '__main__':

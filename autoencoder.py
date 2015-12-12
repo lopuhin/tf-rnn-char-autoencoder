@@ -84,9 +84,6 @@ def _read_inputs(filename, max_seq_length):
     inputs = []
     with codecs.open(filename, 'rb', 'utf-8') as f:
         for line in f:
-            for ch in line:
-                if ch not in char_to_id:
-                    char_to_id[ch] = len(char_to_id) + len(_RESERVED)
             for word in word_re.findall(line):
                 if len(word) < max_seq_length:  # one more for "GO"
                     inputs.append(_encode(word, char_to_id))

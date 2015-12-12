@@ -153,16 +153,21 @@ def _read_inputs(args):
                 pickle.dump(char_to_id, f, protocol=-1)
         def inputs_iter():
             for line in textfile:
+                line = line.strip()
                 if args.words:
                     for word in word_re.findall(line):
                         yield word + ' '
                 else:
                     yield line
-        inputs = [[char_to_id.get(ch, UNK_D) for ch in string]
-                   for string in inputs_iter()
-                   if len(string) < args.max_seq_length]  # one more for "GO"
+        inputs = []
+        for string in inputs_iter():
+            limit = args.max_seq_length - 1  # one more for "GO"
+            if len(string) > limit:
+                string = string[:limit - 1].rsplit(None, 1)[0] + ' '
+            if len(string) <= limit:
+                print string
+                inputs.append([char_to_id.get(ch, UNK_D) for ch in string])
     return inputs, char_to_id
-
 
 
 def _prepare_batch(inputs, input_size, max_seq_length,

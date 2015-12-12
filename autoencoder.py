@@ -90,7 +90,7 @@ def _train(inputs, input_size, args, sess, saver,
         _, loss = sess.run([train_op, decoder_loss], feed_dict)
         losses.append(loss)
         if step % args.report_step == 1:
-            print '{:>3}: loss {:.3f} in {} s'.format(
+            print '{:>3}: loss {:.4f} in {} s'.format(
                 int(step / args.report_step),
                 np.mean(losses),
                 int(time.time() - t0))

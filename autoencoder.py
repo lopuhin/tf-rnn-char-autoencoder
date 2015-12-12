@@ -107,7 +107,7 @@ def _train(inputs, input_size, args, sess, saver,
 def _create_model(input_size, args):
     cell = rnn_cell.LSTMCell(args.state_size, input_size, num_proj=input_size)
     encoder_inputs, decoder_inputs = [[
-        tf.placeholder(tf.float32, shape=[args.batch_size, input_size],
+        tf.placeholder(tf.float32, shape=[None, input_size],
                        name='{}{}'.format(name, i))
         for i in xrange(length)] for name, length in [
             ('encoder', args.max_seq_length),

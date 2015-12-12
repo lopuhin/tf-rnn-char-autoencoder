@@ -112,7 +112,12 @@ def _create_model(input_size, args):
         for i in xrange(length)] for name, length in [
             ('encoder', args.max_seq_length),
             ('decoder', args.max_seq_length)]]
-    loop_function = (lambda prev, _: prev) if args.predict else None
+    embeddings = tf.constant(np.eye(input_size), dtype=tf.float32)
+    loop_function = None
+    if args.predict:
+        def loop_function(prev, _):
+            prev_symbol = tf.stop_gradient(tf.argmax(prev, 1))
+            return tf.nn.embedding_lookup(embeddings, prev_symbol)
     decoder_outputs, _ = seq2seq.tied_rnn_seq2seq(
         encoder_inputs, decoder_inputs, cell, loop_function=loop_function)
     # TODO - add weights

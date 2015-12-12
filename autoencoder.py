@@ -128,7 +128,6 @@ def _read_inputs(args):
     ''' Return a list of inputs (int lists), and an encoding dict.
     '''
     word_re = re.compile(r'\w+', re.U)
-    inputs = []
     with codecs.open(args.filename, 'rb', 'utf-8') as textfile:
         if args.load:
             with open(args.load.rsplit('-', 1)[0] + '.mapping', 'rb') as f:
@@ -144,20 +143,18 @@ def _read_inputs(args):
         if args.save:
             with open(args.save + '.mapping', 'wb') as f:
                 pickle.dump(char_to_id, f, protocol=-1)
-        for line in textfile:
-            if args.words:
-                for word in word_re.findall(line):
-                    word = word + ' '
-                    if len(word) < args.max_seq_length:  # one more for "GO"
-                        inputs.append(_encode(word, char_to_id))
-            else:
-                if len(line) < args.max_seq_length:  # one more for "GO"
-                    inputs.append(_encode(line, char_to_id))
+        def inputs_iter():
+            for line in textfile:
+                if args.words:
+                    for word in word_re.findall(line):
+                        yield word + ' '
+                else:
+                    yield line
+        inputs = [[char_to_id.get(ch, UNK_D) for ch in string]
+                   for string in inputs_iter()
+                   if len(string) < args.max_seq_length]  # one more for "GO"
     return inputs, char_to_id
 
-
-def _encode(string, char_to_id):
-    return [char_to_id.get(ch, UNK_D) for ch in string]
 
 
 def _prepare_batch(inputs, input_size, max_seq_length,

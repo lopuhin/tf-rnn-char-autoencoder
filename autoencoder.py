@@ -112,6 +112,8 @@ def _create_model(input_size, args):
         for i in xrange(length)] for name, length in [
             ('encoder', args.max_seq_length),
             ('decoder', args.max_seq_length)]]
+    # TODO - maybe also use during training,
+    # to avoid building one-hot representation (just an optimization).
     embeddings = tf.constant(np.eye(input_size), dtype=tf.float32)
     loop_function = None
     if args.predict:

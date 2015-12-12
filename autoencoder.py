@@ -6,13 +6,14 @@ import codecs
 import argparse
 import random
 from itertools import chain, repeat, izip
+from collections import Counter
 
 import numpy as np
 import tensorflow as tf
 from tensorflow.models.rnn import seq2seq, rnn_cell
 
 
-PAD_ID, GO_ID = _RESERVED = 0, 1
+PAD_ID, GO_ID, UNK_D = _RESERVED = range(3)
 
 
 def main():
@@ -22,14 +23,18 @@ def main():
     arg('filename')
     arg('--state_size', type=int, default=100)
     arg('--batch_size', type=int, default=32)
-    arg('--max_seq_length', type=int, default=20)  # TODO - buckets?
+    arg('--max-seq-length', type=int, default=100)  # TODO - buckets?
     arg('--n-steps', type=int, default=10000)
     arg('--report-step', type=int, default=100)
+    arg('--min-char-count', type=int, default=100)
     arg('--reverse', action='store_true', help='reverse input')
+    arg('--words', action='store_true', help='encode only single words')
     args = parser.parse_args()
     print 'reading inputs'
-    inputs, char_to_id = _read_inputs(args.filename, args.max_seq_length)
-    input_size = len(char_to_id)
+    inputs, char_to_id = _read_inputs(
+        args.filename, args.max_seq_length,
+        words=args.words, min_char_count=args.min_char_count)
+    input_size = len(char_to_id) + len(_RESERVED)
     print 'input_size', input_size
 
     encoder_inputs, decoder_inputs, decoder_outputs, decoder_loss = \
@@ -69,35 +74,39 @@ def _create_model(input_size, args):
         encoder_inputs, decoder_inputs, cell)
     # TODO - add weights
     targets = decoder_inputs[1:]
-    decoder_loss = tf.reduce_mean(tf.add_n([
+    decoder_loss = (1. / args.max_seq_length) * tf.reduce_mean(tf.add_n([
         tf.nn.softmax_cross_entropy_with_logits(
             logits, target, name='seq_loss_{}'.format(i))
         for i, (logits, target) in enumerate(zip(decoder_outputs, targets))]))
     return encoder_inputs, decoder_inputs, decoder_outputs, decoder_loss
 
 
-def _read_inputs(filename, max_seq_length):
+def _read_inputs(filename, max_seq_length, words, min_char_count):
     ''' Return a list of inputs (int lists), and an encoding dict.
     '''
-    char_to_id = {}
     word_re = re.compile(r'\w+', re.U)
     inputs = []
     with codecs.open(filename, 'rb', 'utf-8') as f:
+        char_counts = Counter(ch for line in f for ch in line)
+        char_to_id = {
+            ch: id_ for id_, ch in enumerate(
+                (ch for ch, count in char_counts.iteritems()
+                    if count >= min_char_count),
+                len(_RESERVED))}
+        f.seek(0)
         for line in f:
-            for word in word_re.findall(line):
-                if len(word) < max_seq_length:  # one more for "GO"
-                    inputs.append(_encode(word, char_to_id))
+            if words:
+                for word in word_re.findall(line):
+                    if len(word) < max_seq_length:  # one more for "GO"
+                        inputs.append(_encode(word, char_to_id))
+            else:
+                if len(line) < max_seq_length:
+                    inputs.append(_encode(line, char_to_id))
     return inputs, char_to_id
 
 
 def _encode(string, char_to_id):
-    result = []
-    for ch in string:
-        id_ = char_to_id.get(ch)
-        if id_ is None:
-            char_to_id[ch] = len(char_to_id) + len(_RESERVED)
-        result.append(id_)
-    return result
+    return [char_to_id.get(ch, UNK_D) for ch in string]
 
 
 def _prepare_batch(inputs, input_size, max_seq_length, reverse=False):

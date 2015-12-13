@@ -113,9 +113,11 @@ class Model(object):
                 for i, (logits, target) in enumerate(
                     zip(self.decoder_outputs, targets))]))
         tf.scalar_summary('loss', self.decoder_loss)
+        self.global_step = tf.Variable(0, name='global_step', trainable=False)
         optimizer = tf.train.AdamOptimizer()
         # TODO - monitor gradient norms, clip them?
-        self.train_op = optimizer.minimize(self.decoder_loss)
+        self.train_op = optimizer.minimize(
+            self.decoder_loss, global_step=self.global_step)
         self.summary_op = tf.merge_all_summaries()
 
     def prepare_batch(self, inputs):
@@ -151,7 +153,7 @@ class Model(object):
             summary_writer = tf.train.SummaryWriter(
                 self.args.save, flush_secs=10)
         for step in xrange(self.args.n_steps):
-            loss = self._train_step(sess, step, inputs, summary_writer)
+            loss = self._train_step(sess, inputs, summary_writer)
             losses.append(loss)
             if step % self.args.report_step == 1:
                 print '{:>3}: loss {:.4f} in {} s'.format(
@@ -164,19 +166,15 @@ class Model(object):
                 if self.args.evaluate:
                     break
 
-    def _train_step(self, sess, step, inputs, summary_writer):
+    def _train_step(self, sess, inputs, summary_writer):
         b_inputs = [random.choice(inputs) for _ in xrange(self.args.batch_size)]
         feed_dict = self.prepare_batch(b_inputs)
-        ops = [self.decoder_loss]
-        write_summary = summary_writer and step % 10 == 1
-        if write_summary:
-            ops.append(self.summary_op)
+        ops = [self.decoder_loss, self.global_step, self.summary_op]
         if not self.args.evaluate:
             ops.append(self.train_op)
-        results = sess.run(ops, feed_dict)
-        loss = results[0]
-        if write_summary:
-            summary_writer.add_summary(results[1], step)
+        loss, step, summary_str = sess.run(ops, feed_dict)[:3]
+        if summary_writer and step % 10 == 0:
+            summary_writer.add_summary(summary_str, step)
         return loss
 
 

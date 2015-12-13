@@ -42,7 +42,7 @@ phrases (061e6b0ce3ed1129cd437af6b6b2653277a9cd2d)::
     ...
     53: 1.22337055206
 
-phrases at 9d07f901a63695e2e7a6cc88a5c484b3ecce74d2::
+phrases at 27e9ce95f43aabacf2ca97c83d36805820ee77ba::
 
     $ ./autoencoder.py ../opencorpora.txt \
         --save models/oc_ph_nor --load models/oc_ph_nor-301

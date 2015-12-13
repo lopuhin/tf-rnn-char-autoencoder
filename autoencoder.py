@@ -28,14 +28,16 @@ def main():
     arg('--state-size', type=int, default=100)
     arg('--batch-size', type=int, default=64)
     arg('--max-seq-length', type=int, default=100)  # TODO - buckets?
-    arg('--n-steps', type=int, default=10000)
+    arg('--n-steps', type=int, default=100000)
     arg('--report-step', type=int, default=100)
     arg('--min-char-count', type=int, default=100)
+    arg('--n-layers', type=int, default=1)
     arg('--reverse', action='store_true', help='reverse input')
     arg('--words', action='store_true', help='encode only single words')
     arg('--load', help='restore model from given file')
     arg('--save', help='save model to given file (plus step number)')
     arg('--predict', action='store_true')
+    arg('--evaluate', action='store_true')
     args = parser.parse_args()
     print args
     inputs, char_to_id = _read_inputs(args)
@@ -79,7 +81,6 @@ def main():
                 encoder_inputs, decoder_inputs, train_op, decoder_loss)
 
 
-
 def _train(inputs, input_size, args, sess, saver,
         encoder_inputs, decoder_inputs, train_op, decoder_loss):
     def _step(step):
@@ -88,7 +89,10 @@ def _train(inputs, input_size, args, sess, saver,
         feed_dict = _prepare_batch(
             b_inputs, input_size, args.max_seq_length,
             encoder_inputs, decoder_inputs, reverse=args.reverse)
-        _, loss = sess.run([train_op, decoder_loss], feed_dict)
+        ops = [decoder_loss]
+        if not args.evaluate:
+            ops.append(train_op)
+        loss = sess.run(ops, feed_dict)[0]
         losses.append(loss)
         if step % args.report_step == 1:
             print '{:>3}: loss {:.4f} in {} s'.format(
@@ -98,14 +102,20 @@ def _train(inputs, input_size, args, sess, saver,
             losses[:] = []
             if args.save:
                 saver.save(sess, args.save, global_step=step)
+            if args.evaluate:
+                return False
+        return True
     losses = []
     t0 = time.time()
     for n in xrange(args.n_steps):
-        _step(n)
+        if not _step(n):
+            break
 
 
 def _create_model(input_size, args):
     cell = rnn_cell.LSTMCell(args.state_size, input_size, num_proj=input_size)
+    if args.n_layers > 1:
+        cell = rnn_cell.MultiRNNCell([cell] * args.n_layers)
     encoder_inputs, decoder_inputs = [[
         tf.placeholder(tf.float32, shape=[None, input_size],
                        name='{}{}'.format(name, i))

@@ -91,6 +91,8 @@ class Model(object):
                 ('decoder', self.args.max_seq_length)]]
         # TODO - maybe also use during training,
         # to avoid building one-hot representation (just an optimization).
+        # Another (maybe better) way to do is described here
+        # https://www.tensorflow.org/versions/master/tutorials/mnist/tf/index.html#loss
         embeddings = tf.constant(np.eye(input_size), dtype=tf.float32)
         loop_function = None
         if args.predict:
@@ -110,9 +112,11 @@ class Model(object):
                     logits, target, name='seq_loss_{}'.format(i))
                 for i, (logits, target) in enumerate(
                     zip(self.decoder_outputs, targets))]))
+        tf.scalar_summary('loss', self.decoder_loss)
         optimizer = tf.train.AdamOptimizer()
         # TODO - monitor gradient norms, clip them?
         self.train_op = optimizer.minimize(self.decoder_loss)
+        self.summary_op = tf.merge_all_summaries()
 
     def prepare_batch(self, inputs):
         ''' Prepare batch for training: return batch_inputs and batch_outputs,
@@ -142,8 +146,12 @@ class Model(object):
     def train(self, sess, saver, inputs):
         losses = []
         t0 = time.time()
+        summary_writer = None
+        if self.args.save:
+            summary_writer = tf.train.SummaryWriter(
+                self.args.save, flush_secs=10)
         for step in xrange(self.args.n_steps):
-            loss = self._train_step(sess, inputs)
+            loss = self._train_step(sess, step, inputs, summary_writer)
             losses.append(loss)
             if step % self.args.report_step == 1:
                 print '{:>3}: loss {:.4f} in {} s'.format(
@@ -156,13 +164,19 @@ class Model(object):
                 if self.args.evaluate:
                     break
 
-    def _train_step(self, sess, inputs):
+    def _train_step(self, sess, step, inputs, summary_writer):
         b_inputs = [random.choice(inputs) for _ in xrange(self.args.batch_size)]
         feed_dict = self.prepare_batch(b_inputs)
         ops = [self.decoder_loss]
+        write_summary = summary_writer and step % 10 == 1
+        if write_summary:
+            ops.append(self.summary_op)
         if not self.args.evaluate:
             ops.append(self.train_op)
-        loss = sess.run(ops, feed_dict)[0]
+        results = sess.run(ops, feed_dict)
+        loss = results[0]
+        if write_summary:
+            summary_writer.add_summary(results[1], step)
         return loss
 
 

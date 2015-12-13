@@ -44,11 +44,7 @@ def main():
     input_size = len(char_to_id) + len(_RESERVED)
     print 'input_size', input_size
 
-    encoder_inputs, decoder_inputs, decoder_outputs, decoder_loss = \
-        _create_model(input_size, args)
-    optimizer = tf.train.AdamOptimizer()
-    # TODO - monitor gradient norms, clip them?
-    train_op = optimizer.minimize(decoder_loss)
+    model = Model(input_size, args)
     saver = tf.train.Saver(tf.all_variables())
 
     with tf.Session() as sess:
@@ -61,10 +57,8 @@ def main():
             for id_ in _RESERVED:
                 id_to_char[id_] = ''
             for batch in chunks(inputs, args.batch_size):
-                feed_dict = _prepare_batch(
-                    batch, input_size, args.max_seq_length,
-                    encoder_inputs, decoder_inputs, reverse=args.reverse)
-                outputs = sess.run(decoder_outputs, feed_dict)
+                feed_dict = model.prepare_batch(batch)
+                outputs = sess.run(model.decoder_outputs, feed_dict)
                 input_lines = [[id_to_char[id_] for id_ in line]
                                for line in batch]
                 output_lines = [[] for _ in xrange(args.batch_size)]
@@ -77,69 +71,99 @@ def main():
                     print ''.join(out)
                 import pdb; pdb.set_trace()
         else:
-            _train(inputs, input_size, args, sess, saver,
-                encoder_inputs, decoder_inputs, train_op, decoder_loss)
+            model.train(sess, saver, inputs)
 
 
-def _train(inputs, input_size, args, sess, saver,
-        encoder_inputs, decoder_inputs, train_op, decoder_loss):
-    def _step(step):
-        feed_dict = {}
-        b_inputs = [random.choice(inputs) for _ in xrange(args.batch_size)]
-        feed_dict = _prepare_batch(
-            b_inputs, input_size, args.max_seq_length,
-            encoder_inputs, decoder_inputs, reverse=args.reverse)
-        ops = [decoder_loss]
-        if not args.evaluate:
-            ops.append(train_op)
+class Model(object):
+    def __init__(self, input_size, args):
+        self.input_size = input_size
+        self.args = args
+        self.batch_size = args.batch_size
+        cell = rnn_cell.LSTMCell(
+            args.state_size, input_size, num_proj=input_size)
+        if args.n_layers > 1:
+            cell = rnn_cell.MultiRNNCell([cell] * args.n_layers)
+        self.encoder_inputs, self.decoder_inputs = [[
+            tf.placeholder(tf.float32, shape=[None, input_size],
+                        name='{}{}'.format(name, i))
+            for i in xrange(length)] for name, length in [
+                ('encoder', self.args.max_seq_length),
+                ('decoder', self.args.max_seq_length)]]
+        # TODO - maybe also use during training,
+        # to avoid building one-hot representation (just an optimization).
+        embeddings = tf.constant(np.eye(input_size), dtype=tf.float32)
+        loop_function = None
+        if args.predict:
+            def loop_function(prev, _):
+                prev_symbol = tf.stop_gradient(tf.argmax(prev, 1))
+                return tf.nn.embedding_lookup(embeddings, prev_symbol)
+        self.decoder_outputs, _ = seq2seq.tied_rnn_seq2seq(
+            self.encoder_inputs, self.decoder_inputs, cell,
+            loop_function=loop_function)
+        # TODO - add weights
+        targets = self.decoder_inputs[1:]
+        # FIXME - this scaling by max_seq_length does not take
+        # padding into account (see also weights)
+        self.decoder_loss = (1. / self.args.max_seq_length) * \
+            tf.reduce_mean(tf.add_n([
+                tf.nn.softmax_cross_entropy_with_logits(
+                    logits, target, name='seq_loss_{}'.format(i))
+                for i, (logits, target) in enumerate(
+                    zip(self.decoder_outputs, targets))]))
+        optimizer = tf.train.AdamOptimizer()
+        # TODO - monitor gradient norms, clip them?
+        self.train_op = optimizer.minimize(self.decoder_loss)
+
+    def prepare_batch(self, inputs):
+        ''' Prepare batch for training: return batch_inputs and batch_outputs,
+        where each is a list of float32 arrays of shape (batch_size, input_size),
+        adding padding and "GO" symbol.
+        '''
+        batch_size = len(inputs)
+        batch_inputs, batch_outputs = [
+            [np.zeros([batch_size, self.input_size], dtype=np.float32)
+            for _ in xrange(self.args.max_seq_length)] for _ in xrange(2)]
+        for n_batch, input_ in enumerate(inputs):
+            n_pad = (self.args.max_seq_length - len(input_))
+            padded_input = [PAD_ID] * n_pad + list(
+                reversed(input_) if self.args.reverse else input_)
+            for values, seq in [
+                    (batch_inputs, [padded_input]),
+                    (batch_outputs, [[GO_ID], input_ , repeat(PAD_ID, n_pad - 1)])
+                    ]:
+                for i, id_ in enumerate(chain(*seq)):
+                    values[i][n_batch][id_] = 1.0
+        feed_dict = {
+            var.name: val for var, val in
+            chain(izip(self.encoder_inputs, batch_inputs),
+                  izip(self.decoder_inputs, batch_outputs))}
+        return feed_dict
+
+    def train(self, sess, saver, inputs):
+        losses = []
+        t0 = time.time()
+        for step in xrange(self.args.n_steps):
+            loss = self._train_step(sess, inputs)
+            losses.append(loss)
+            if step % self.args.report_step == 1:
+                print '{:>3}: loss {:.4f} in {} s'.format(
+                    int(step / self.args.report_step),
+                    np.mean(losses),
+                    int(time.time() - t0))
+                losses = []
+                if self.args.save:
+                    saver.save(sess, self.args.save, global_step=step)
+                if self.args.evaluate:
+                    break
+
+    def _train_step(self, sess, inputs):
+        b_inputs = [random.choice(inputs) for _ in xrange(self.args.batch_size)]
+        feed_dict = self.prepare_batch(b_inputs)
+        ops = [self.decoder_loss]
+        if not self.args.evaluate:
+            ops.append(self.train_op)
         loss = sess.run(ops, feed_dict)[0]
-        losses.append(loss)
-        if step % args.report_step == 1:
-            print '{:>3}: loss {:.4f} in {} s'.format(
-                int(step / args.report_step),
-                np.mean(losses),
-                int(time.time() - t0))
-            losses[:] = []
-            if args.save:
-                saver.save(sess, args.save, global_step=step)
-            if args.evaluate:
-                return False
-        return True
-    losses = []
-    t0 = time.time()
-    for n in xrange(args.n_steps):
-        if not _step(n):
-            break
-
-
-def _create_model(input_size, args):
-    cell = rnn_cell.LSTMCell(args.state_size, input_size, num_proj=input_size)
-    if args.n_layers > 1:
-        cell = rnn_cell.MultiRNNCell([cell] * args.n_layers)
-    encoder_inputs, decoder_inputs = [[
-        tf.placeholder(tf.float32, shape=[None, input_size],
-                       name='{}{}'.format(name, i))
-        for i in xrange(length)] for name, length in [
-            ('encoder', args.max_seq_length),
-            ('decoder', args.max_seq_length)]]
-    # TODO - maybe also use during training,
-    # to avoid building one-hot representation (just an optimization).
-    embeddings = tf.constant(np.eye(input_size), dtype=tf.float32)
-    loop_function = None
-    if args.predict:
-        def loop_function(prev, _):
-            prev_symbol = tf.stop_gradient(tf.argmax(prev, 1))
-            return tf.nn.embedding_lookup(embeddings, prev_symbol)
-    decoder_outputs, _ = seq2seq.tied_rnn_seq2seq(
-        encoder_inputs, decoder_inputs, cell, loop_function=loop_function)
-    # TODO - add weights
-    targets = decoder_inputs[1:]
-    # TODO - this scaling by max_seq_length does not take padding into account
-    decoder_loss = (1. / args.max_seq_length) * tf.reduce_mean(tf.add_n([
-        tf.nn.softmax_cross_entropy_with_logits(
-            logits, target, name='seq_loss_{}'.format(i))
-        for i, (logits, target) in enumerate(zip(decoder_outputs, targets))]))
-    return encoder_inputs, decoder_inputs, decoder_outputs, decoder_loss
+        return loss
 
 
 def _read_inputs(args):
@@ -177,33 +201,6 @@ def _read_inputs(args):
             if len(string) <= limit:
                 inputs.append([char_to_id.get(ch, UNK_D) for ch in string])
     return inputs, char_to_id
-
-
-def _prepare_batch(inputs, input_size, max_seq_length,
-        encoder_inputs, decoder_inputs, reverse=False):
-    ''' Prepare batch for training: return batch_inputs and batch_outputs,
-    where each is a list of float32 arrays of shape (batch_size, input_size),
-    adding padding and "GO" symbol.
-    '''
-    batch_size = len(inputs)
-    batch_inputs, batch_outputs = [
-        [np.zeros([batch_size, input_size], dtype=np.float32)
-         for _ in xrange(max_seq_length)] for _ in xrange(2)]
-    for n_batch, input_ in enumerate(inputs):
-        n_pad = (max_seq_length - len(input_))
-        padded_input = [PAD_ID] * n_pad + list(
-            reversed(input_) if reverse else input_)
-        for values, seq in [
-                (batch_inputs, [padded_input]),
-                (batch_outputs, [[GO_ID], input_ , repeat(PAD_ID, n_pad - 1)])
-                ]:
-            for i, id_ in enumerate(chain(*seq)):
-                values[i][n_batch][id_] = 1.0
-    feed_dict = {
-        var.name: val for var, val in
-        chain(izip(encoder_inputs, batch_inputs),
-              izip(decoder_inputs, batch_outputs))}
-    return feed_dict
 
 
 if __name__ == '__main__':

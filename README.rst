@@ -63,3 +63,9 @@ phrases at 27e9ce95f43aabacf2ca97c83d36805820ee77ba::
     $ ./autoencoder.py ~/programming/ling/corpora/opencorpora.txt \
         --max-seq-length=60 --n-layers=2 --state-size=256 --save=oc_ph_60_2_256
     136: loss 0.8219 in 29395 s
+    ...
+    775: loss 0.1490 in 133614 s
+    ...
+    809: loss 0.1506 in 139551 s
+    810: loss 0.9073 in 139726 s
+    811: loss 3.2113 in 139898 s

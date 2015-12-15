@@ -48,3 +48,10 @@ def debug_exec(*deco_args, **deco_kwargs):
 def chunks(lst, n):
     for i in xrange(0, len(lst), n):
         yield lst[i:i+n]
+
+
+def split(lst, proportion, max_valid=None):
+    split_at = int(len(lst) * proportion)
+    if max_valid is not None:
+        split_at = max(split_at, len(lst) - max_valid)
+    return lst[:split_at], lst[split_at:]

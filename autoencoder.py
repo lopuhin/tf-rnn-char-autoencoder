@@ -14,20 +14,19 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.models.rnn import seq2seq, rnn_cell
 
-from utils import chunks
+from utils import chunks, split
 
 
 PAD_ID, GO_ID, UNK_D = _RESERVED = range(3)
 
 
 def main():
-    random.seed(1)
     parser = argparse.ArgumentParser()
     arg = parser.add_argument
     arg('filename')
     arg('--state-size', type=int, default=100)
     arg('--batch-size', type=int, default=64)
-    arg('--max-seq-length', type=int, default=100)  # TODO - buckets?
+    arg('--max-seq-length', type=int, default=60)  # TODO - buckets?
     arg('--n-steps', type=int, default=100000)
     arg('--report-step', type=int, default=100)
     arg('--min-char-count', type=int, default=100)
@@ -40,9 +39,13 @@ def main():
     arg('--evaluate', action='store_true')
     args = parser.parse_args()
     print args
+    random.seed(1)
     inputs, char_to_id = _read_inputs(args)
+    random.shuffle(inputs)
+    train_inputs, valid_inputs = split(inputs, 0.9, max_valid=2000)
     input_size = len(char_to_id) + len(_RESERVED)
-    print 'input_size', input_size
+    print '{} chars, train set size {}, valid set size {}'.format(
+       input_size, len(train_inputs), len(valid_inputs))
 
     model = Model(input_size, args)
     saver = tf.train.Saver(tf.all_variables())
@@ -71,7 +74,7 @@ def main():
                     print ''.join(out)
                 import pdb; pdb.set_trace()
         else:
-            model.train(sess, saver, inputs)
+            model.train(sess, saver, train_inputs, valid_inputs)
 
 
 class Model(object):
@@ -112,7 +115,9 @@ class Model(object):
                     logits, target, name='seq_loss_{}'.format(i))
                 for i, (logits, target) in enumerate(
                     zip(self.decoder_outputs, targets))]))
-        tf.scalar_summary('loss', self.decoder_loss)
+        tf.scalar_summary('train loss', self.decoder_loss)
+        self.valid_loss = 1.0 * self.decoder_loss  # FIXME
+        tf.scalar_summary('valid loss', self.valid_loss)
         self.global_step = tf.Variable(0, name='global_step', trainable=False)
         optimizer = tf.train.AdamOptimizer()
         # TODO - monitor gradient norms, clip them?
@@ -145,21 +150,24 @@ class Model(object):
                   izip(self.decoder_inputs, batch_outputs))}
         return feed_dict
 
-    def train(self, sess, saver, inputs):
+    def train(self, sess, saver, train_inputs, valid_inputs):
         losses = []
-        t0 = time.time()
         summary_writer = None
         if self.args.save:
             summary_writer = tf.train.SummaryWriter(
                 self.args.save, flush_secs=10)
-        for step in xrange(self.args.n_steps):
-            loss = self._train_step(sess, inputs, summary_writer)
+        t0 = time.time()
+        for i in xrange(self.args.n_steps):
+            loss = self._train_step(sess, train_inputs, summary_writer)
             losses.append(loss)
-            if step % self.args.report_step == 1:
-                print '{:>3}: loss {:.4f} in {} s'.format(
-                    int(step / self.args.report_step),
-                    np.mean(losses),
-                    int(time.time() - t0))
+            step = self.global_step.eval()
+            if i == 0 or step % self.args.report_step == 0:
+                print '{:>5}: train loss {:.4f}, valid loss {:.4f} in {} s'\
+                    .format(
+                        step,
+                        np.mean(losses),
+                        self._valid_loss(sess, valid_inputs, summary_writer),
+                        int(time.time() - t0))
                 losses = []
                 if self.args.save:
                     saver.save(sess, self.args.save, global_step=step)
@@ -169,12 +177,21 @@ class Model(object):
     def _train_step(self, sess, inputs, summary_writer):
         b_inputs = [random.choice(inputs) for _ in xrange(self.args.batch_size)]
         feed_dict = self.prepare_batch(b_inputs)
-        ops = [self.decoder_loss, self.global_step, self.summary_op]
+        ops = [self.decoder_loss, self.summary_op]
         if not self.args.evaluate:
             ops.append(self.train_op)
-        loss, step, summary_str = sess.run(ops, feed_dict)[:3]
+        loss, summary_str = sess.run(ops, feed_dict)[:2]
+        step = self.global_step.eval()
         if summary_writer and step % 10 == 0:
             summary_writer.add_summary(summary_str, step)
+        return loss
+
+    def _valid_loss(self, sess, valid_inputs, summary_writer):
+        loss, summary_str = sess.run(
+            [self.valid_loss, self.summary_op],
+            feed_dict=self.prepare_batch(valid_inputs))
+        if summary_writer:
+            summary_writer.add_summary(summary_str, self.global_step.eval())
         return loss
 
 

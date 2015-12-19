@@ -69,3 +69,69 @@ phrases at 27e9ce95f43aabacf2ca97c83d36805820ee77ba::
     809: loss 0.1506 in 139551 s
     810: loss 0.9073 in 139726 s
     811: loss 3.2113 in 139898 s
+
+
+
+::
+
+    $ ./autoencoder.py --state-size=100 --n-layers=2 ../corpora/opencorpora.txt --save=models/oc_100_2
+    Namespace(batch_size=64, evaluate=False, filename='../corpora/opencorpora.txt', load=None, max_seq_length=60, min_char_count=100, n_layers=2, n_steps=100000, predict=False, report_step=100, reverse=False, save='models/oc_100_2', state_size=100, words=False)
+    158 chars, train set size 92112, valid set size 2000
+        1: train loss 4.9637, valid loss 4.9021 in 12 s
+      100: train loss 3.1555, valid loss 2.7622 in 157 s
+      200: train loss 2.7090, valid loss 2.6445 in 307 s
+      300: train loss 2.5380, valid loss 2.4422 in 445 s
+      400: train loss 2.3865, valid loss 2.3276 in 582 s
+      500: train loss 2.3022, valid loss 2.2505 in 721 s
+      600: train loss 2.2390, valid loss 2.1890 in 857 s
+
+::
+
+    $ ./autoencoder.py --state-size=100 --n-layers=2 easy-5k-mean.txt --save=models/easy_100_2
+    Namespace(batch_size=64, evaluate=False, filename='easy-5k-mean.txt', load=None, max_seq_length=60, min_char_count=100, n_layers=2, n_steps=100000, predict=False, report_step=100, reverse=False, save='models/easy_100_2', state_size=100, words=False)
+    87 chars, train set size 4500, valid set size 500
+        1: train loss 4.3770, valid loss 4.3390 in 5 s
+      100: train loss 2.8475, valid loss 2.5244 in 110 s
+      200: train loss 2.5042, valid loss 2.4364 in 216 s
+      300: train loss 2.3494, valid loss 2.2305 in 322 s
+      400: train loss 2.1734, valid loss 2.0840 in 427 s
+      500: train loss 2.0741, valid loss 2.0237 in 540 s
+      600: train loss 2.0151, valid loss 1.9727 in 650 s
+      700: train loss 1.9562, valid loss 1.9334 in 759 s
+      800: train loss 1.9228, valid loss 1.9041 in 871 s
+      900: train loss 1.9010, valid loss 1.8723 in 984 s
+     1000: train loss 1.8661, valid loss 1.8517 in 1096 s
+     1100: train loss 1.8402, valid loss 1.8177 in 1205 s
+     1200: train loss 1.8362, valid loss 1.8067 in 1314 s
+
+
+::
+
+    $ ./autoencoder.py ../easy-5k-mean.txt --state-size=256 --n-layers=2 --save models/easy_256_2 --max-seq-length 100
+    Namespace(batch_size=64, evaluate=False, filename='../easy-5k-mean.txt', load=None, max_seq_length=100, min_char_count=100, n_layers=2, n_steps=100000, predict=False, report_step
+    =100, reverse=False, save='models/easy_256_2', state_size=256, words=False)
+    87 chars, train set size 4500, valid set size 500
+        1: train loss 4.4241, valid loss 4.2667 in 11 s
+      100: train loss 2.2933, valid loss 2.0396 in 174 s
+      200: train loss 1.9721, valid loss 1.8683 in 336 s
+      300: train loss 1.7892, valid loss 1.7046 in 498 s
+      400: train loss 1.6760, valid loss 1.6166 in 659 s
+      500: train loss 1.5971, valid loss 1.5617 in 819 s
+      600: train loss 1.5493, valid loss 1.5217 in 980 s
+      700: train loss 1.4865, valid loss 1.4815 in 1141 s
+      800: train loss 1.4489, valid loss 1.4511 in 1302 s
+      900: train loss 1.4336, valid loss 1.4294 in 1463 s
+     1000: train loss 1.3983, valid loss 1.4019 in 1625 s
+     1100: train loss 1.3877, valid loss 1.3807 in 1786 s
+     1200: train loss 1.3583, valid loss 1.3598 in 1947 s
+
+
+::
+
+    ./autoencoder.py ../opencorpora.txt --state-size=256 --n-layers=2 --save models/oc_256_2 --max-seq-length 100 --report-step=200
+    Namespace(batch_size=64, evaluate=False, filename='../opencorpora.txt', load=None, max_seq_length=100, min_char_count=100, n_layers=2, n_steps=100000, predict=False, report_step=200, reverse=False, save='models/oc_256_2', state_size=256, words=False)
+    158 chars, train set size 93112, valid set size 1000
+        1: train loss 5.0125, valid loss 4.9021 in 12 s
+      200: train loss 2.6352, valid loss 2.3482 in 338 s
+
+

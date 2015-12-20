@@ -121,7 +121,6 @@ class Model(object):
         tf.scalar_summary('valid loss', self.valid_loss)
         self.global_step = tf.Variable(0, name='global_step', trainable=False)
         optimizer = tf.train.AdamOptimizer()
-        # TODO - monitor gradient norms, clip them?
         params = tf.trainable_variables()
         gradients = tf.gradients(self.decoder_loss, params)
         clipped_gradients, _norm = tf.clip_by_global_norm(

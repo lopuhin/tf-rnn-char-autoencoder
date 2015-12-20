@@ -31,6 +31,7 @@ def main():
     arg('--report-step', type=int, default=100)
     arg('--min-char-count', type=int, default=100)
     arg('--n-layers', type=int, default=1)
+    arg('--max-gradient-norm', type=float, default=5.0)
     arg('--reverse', action='store_true', help='reverse input')
     arg('--words', action='store_true', help='encode only single words')
     arg('--load', help='restore model from given file')
@@ -121,8 +122,13 @@ class Model(object):
         self.global_step = tf.Variable(0, name='global_step', trainable=False)
         optimizer = tf.train.AdamOptimizer()
         # TODO - monitor gradient norms, clip them?
-        self.train_op = optimizer.minimize(
-            self.decoder_loss, global_step=self.global_step)
+        params = tf.trainable_variables()
+        gradients = tf.gradients(self.decoder_loss, params)
+        clipped_gradients, _norm = tf.clip_by_global_norm(
+            gradients, self.args.max_gradient_norm)
+        # TODO - monitor norm
+        self.train_op = optimizer.apply_gradients(
+            zip(clipped_gradients, params), global_step=self.global_step)
         self.summary_op = tf.merge_all_summaries()
 
     def prepare_batch(self, inputs):

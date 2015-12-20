@@ -135,3 +135,51 @@ phrases at 27e9ce95f43aabacf2ca97c83d36805820ee77ba::
       200: train loss 2.6352, valid loss 2.3482 in 338 s
 
 
+random-limit speeds up training a lot (028ff8422a0dd7fcd451d3dcf78d0b7c226eb4dc)::
+
+    ./autoencoder.py --state-size=256 frank.txt --max-seq-length=40 --random-limit --min-char-count 10 --save models/frank_256_1_40_rand 
+    Namespace(batch_size=64, evaluate=False, filename='frank.txt', load=None, max_gradient_norm=5.0, max_seq_length=40, min_char_count=10, n_layers=1, n_steps=100000, predict=False, random_limit=True, report_step=100, reverse=False, save='models/frank_256_1_40_rand', state_size=256, words=False)
+    71 chars, train set size 1116, valid set size 125
+        1: train loss 4.2112, valid loss 4.1370 in 1 s
+      100: train loss 1.8699, valid loss 1.6533 in 50 s
+      200: train loss 1.3919, valid loss 1.5078 in 100 s
+      300: train loss 1.3081, valid loss 1.4206 in 149 s
+      400: train loss 1.2193, valid loss 1.3295 in 197 s
+      500: train loss 1.1664, valid loss 1.2877 in 247 s
+      600: train loss 1.0852, valid loss 1.2488 in 298 s
+      700: train loss 1.0703, valid loss 1.2186 in 347 s
+      800: train loss 1.0545, valid loss 1.2320 in 395 s
+      900: train loss 1.0142, valid loss 1.1727 in 443 s
+     1000: train loss 1.0199, valid loss 1.1898 in 492 s
+     1100: train loss 0.9755, valid loss 1.1397 in 541 s
+     1200: train loss 0.9711, valid loss 1.1185 in 592 s
+     1300: train loss 0.9422, valid loss 1.1158 in 657 s
+     1400: train loss 0.9245, valid loss 1.0925 in 724 s
+     1500: train loss 0.9045, valid loss 1.0827 in 774 s
+     1600: train loss 0.8787, valid loss 1.0723 in 825 s
+     1700: train loss 0.8769, valid loss 1.0493 in 877 s
+     1800: train loss 0.8309, valid loss 1.0453 in 926 s
+     1900: train loss 0.8317, valid loss 1.0446 in 975 s
+     2000: train loss 0.8111, valid loss 1.0243 in 1028 s
+     2100: train loss 0.7998, valid loss 1.0261 in 1080 s
+     2200: train loss 0.7740, valid loss 1.0078 in 1133 s
+     2300: train loss 0.7568, valid loss 1.0014 in 1184 s
+     2400: train loss 0.7449, valid loss 0.9908 in 1233 s
+
+same test on opencorpora - "harder" corpora does not matter much::
+
+    $ ./autoencoder.py --state-size=256 ../corpora/opencorpora.txt --max-seq-length=40 --random-limit --save models/oc_256_1_40_rand
+    Namespace(batch_size=64, evaluate=False, filename='../corpora/opencorpora.txt', load=None, max_gradient_norm=5.0, max_seq_length=40, min_char_count=100, n_layers=1, n_steps=100000, predict=False, random_limit=True, report_step=100, reverse=False, save='models/oc_256_1_40_rand', state_size=256, words=False)
+    158 chars, train set size 92112, valid set size 2000
+        1: train loss 4.9348, valid loss 4.8035 in 7 s
+      100: train loss 1.9603, valid loss 1.5191 in 84 s
+      200: train loss 1.4415, valid loss 1.3879 in 162 s
+      300: train loss 1.3460, valid loss 1.2915 in 241 s
+      400: train loss 1.2405, valid loss 1.2089 in 319 s
+      500: train loss 1.1727, valid loss 1.1614 in 426 s
+      600: train loss 1.1233, valid loss 1.0886 in 501 s
+      700: train loss 1.0895, valid loss 1.0604 in 575 s
+      800: train loss 1.0549, valid loss 1.0389 in 648 s
+      900: train loss 1.0435, valid loss 1.0111 in 721 s
+     1000: train loss 1.0261, valid loss 1.0093 in 794 s
+     1100: train loss 0.9910, valid loss 0.9871 in 870 s

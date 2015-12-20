@@ -34,6 +34,8 @@ def main():
     arg('--max-gradient-norm', type=float, default=5.0)
     arg('--reverse', action='store_true', help='reverse input')
     arg('--words', action='store_true', help='encode only single words')
+    arg('--random-limit', action='store_true',
+        help='randomly reduce input length')
     arg('--load', help='restore model from given file')
     arg('--save', help='save model to given file (plus step number)')
     arg('--predict', action='store_true')
@@ -230,6 +232,8 @@ def _read_inputs(args):
         inputs = []
         for string in inputs_iter():
             limit = args.max_seq_length - 1  # one more for "GO"
+            if args.random_limit:
+                limit = random.randint(2, limit)
             if len(string) > limit:
                 string = string[:limit - 1].rsplit(None, 1)[0] + ' '
             if len(string) <= limit:

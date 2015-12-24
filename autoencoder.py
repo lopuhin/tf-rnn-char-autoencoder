@@ -26,11 +26,12 @@ def main():
     arg('filename')
     arg('--state-size', type=int, default=100)
     arg('--batch-size', type=int, default=64)
-    arg('--max-seq-length', type=int, default=60)  # TODO - buckets?
+    arg('--max-seq-length', type=int, default=60)
     arg('--n-steps', type=int, default=100000)
     arg('--report-step', type=int, default=100)
     arg('--min-char-count', type=int, default=100)
     arg('--n-layers', type=int, default=1)
+    arg('--cell', default='lstm', help='Cell type: lstm, lstm-basic, gru')
     arg('--max-gradient-norm', type=float, default=5.0)
     arg('--reverse', action='store_true', help='reverse input')
     arg('--words', action='store_true', help='encode only single words')
@@ -85,10 +86,23 @@ class Model(object):
         self.input_size = input_size
         self.args = args
         self.batch_size = args.batch_size
-        cell = rnn_cell.LSTMCell(
-            args.state_size, input_size, num_proj=input_size)
+
+        if args.cell == 'lstm':
+            cell = rnn_cell.LSTMCell(
+                args.state_size, input_size, num_proj=input_size)
+        else:
+            if args.cell == 'gru':
+                cell_class = rnn_cell.GRUCell
+            elif args.cell == 'lstm-basic':
+                cell_class = rnn_cell.BasicLSTMCell
+            basic_cell = cell_class(args.state_size)
+            # TODO - do bulk input/output projecttions
+            cell = rnn_cell.InputProjectionWrapper(
+                rnn_cell.OutputProjectionWrapper(basic_cell, input_size),
+                input_size)
         if args.n_layers > 1:
             cell = rnn_cell.MultiRNNCell([cell] * args.n_layers)
+
         self.encoder_inputs, self.decoder_inputs = [[
             tf.placeholder(tf.float32, shape=[None, input_size],
                         name='{}{}'.format(name, i))

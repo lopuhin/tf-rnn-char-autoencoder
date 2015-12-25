@@ -248,3 +248,29 @@ same test on opencorpora - "harder" corpora does not matter much::
       400: train loss 1.1323, valid loss 1.0838 in 413 s
       ...
     32000: train loss 0.0128, valid loss 0.0192 in 32624 s
+
+GRU & LSTM-basic
+----------------
+
+f2921e50065173636d5e64fa52866be5e43a114d, GRU::
+
+    $ ./autoencoder.py --state-size=256 --n-layers=2 ../corpora/opencorpora.txt --max-seq-length=60 --random-limit --cell=gru --save models/oc_256_2_60_rand_gru
+    Namespace(batch_size=64, cell='gru', evaluate=False, filename='../corpora/opencorpora.txt', load=None, max_gradient_norm=5.0, max_seq_length=60, min_char_count=100, n_layers=2, n_steps=100000, predict=False, random_limit=True, report_step=100, reverse=False, save='models/oc_256_2_60_rand_gru', state_size=256, words=False)
+    158 chars, train set size 92112, valid set size 2000
+        1: train loss 4.9506, valid loss 4.4924 in 23 s
+      100: train loss 1.4869, valid loss 1.2472 in 319 s
+      200: train loss 1.1386, valid loss 1.1019 in 615 s
+      300: train loss 1.0402, valid loss 1.0187 in 897 s
+      ...
+     2000: train loss 0.4305, valid loss 0.4274 in 5600 s
+
+LSTM-basic is slower, but looks better than default LSTM::
+
+    $ ./autoencoder.py --state-size=256 --n-layers=2 ../corpora/opencorpora.txt --max-seq-length=60 --random-limit --cell=lstm-basic --save models/oc_256_2_60_rand_lstmbasic
+    Namespace(batch_size=64, cell='lstm-basic', evaluate=False, filename='../corpora/opencorpora.txt', load=None, max_gradient_norm=5.0, max_seq_length=60, min_char_count=100, n_layers=2, n_steps=100000, predict=False, random_limit=True, report_step=100, reverse=False, save='models/oc_256_2_60_rand_lstmbasic', state_size=256, words=False)
+    158 chars, train set size 92112, valid set size 2000
+        1: train loss 4.9580, valid loss 4.5178 in 37 s
+      100: train loss 1.5467, valid loss 1.2869 in 384 s
+      200: train loss 1.1840, valid loss 1.1549 in 719 s
+      300: train loss 1.1181, valid loss 1.1116 in 1102 s
+

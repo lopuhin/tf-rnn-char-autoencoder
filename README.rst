@@ -1,7 +1,7 @@
-LSTM Character Autoencoder
-==========================
+RNN Character Autoencoder
+=========================
 
-LSTM character-level sequence autoencoder built with TensorFlow: learns by
+RNN character-level sequence autoencoder built with TensorFlow: learns by
 reconstructing sentences in order to build good sentence representations.
 
 Runnable on CPU and GPU, image on AWS with TensorFlow:

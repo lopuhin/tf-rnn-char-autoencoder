@@ -43,7 +43,10 @@ def main():
     arg('--evaluate', action='store_true')
     args = parser.parse_args()
     print args
-    random.seed(1)
+    seed = 1
+    random.seed(seed)
+    np.random.seed(seed)
+    tf.set_random_seed(seed)
     inputs, char_to_id = _read_inputs(args)
     random.shuffle(inputs)
     train_inputs, valid_inputs = split(inputs, 0.9, max_valid=2000)

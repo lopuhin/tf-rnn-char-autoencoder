@@ -12,7 +12,8 @@ import cPickle as pickle
 
 import numpy as np
 import tensorflow as tf
-from tensorflow.models.rnn import seq2seq, rnn_cell
+import tensorflow.contrib.rnn as rnn_cell
+import tensorflow.contrib.legacy_seq2seq as seq2seq
 
 from utils import chunks, split
 
@@ -55,13 +56,13 @@ def main():
        input_size, len(train_inputs), len(valid_inputs))
 
     model = Model(input_size, args)
-    saver = tf.train.Saver(tf.all_variables())
+    saver = tf.train.Saver(tf.global_variables())
 
     with tf.Session() as sess:
         if args.load:
             saver.restore(sess, args.load)
         else:
-            sess.run(tf.initialize_all_variables())
+            sess.run(tf.global_variables_initializer())
         if args.predict:
             id_to_char = {id_: ch for ch, id_ in char_to_id.iteritems()}
             for id_ in _RESERVED:
@@ -132,12 +133,12 @@ class Model(object):
         self.decoder_loss = (1. / self.args.max_seq_length) * \
             tf.reduce_mean(tf.add_n([
                 tf.nn.softmax_cross_entropy_with_logits(
-                    logits, target, name='seq_loss_{}'.format(i))
+                    logits=logits, labels=target, name='seq_loss_{}'.format(i))
                 for i, (logits, target) in enumerate(
                     zip(self.decoder_outputs, targets))]))
-        tf.scalar_summary('train loss', self.decoder_loss)
+        tf.summary.scalar('train loss', self.decoder_loss)
         self.valid_loss = 1.0 * self.decoder_loss  # FIXME
-        tf.scalar_summary('valid loss', self.valid_loss)
+        tf.summary.scalar('valid loss', self.valid_loss)
         self.global_step = tf.Variable(0, name='global_step', trainable=False)
         optimizer = tf.train.AdamOptimizer()
         params = tf.trainable_variables()
@@ -147,7 +148,7 @@ class Model(object):
         # TODO - monitor norm
         self.train_op = optimizer.apply_gradients(
             zip(clipped_gradients, params), global_step=self.global_step)
-        self.summary_op = tf.merge_all_summaries()
+        self.summary_op = tf.summary.merge_all()
 
     def prepare_batch(self, inputs):
         ''' Prepare batch for training: return batch_inputs and batch_outputs,
@@ -178,7 +179,7 @@ class Model(object):
         losses = []
         summary_writer = None
         if self.args.save:
-            summary_writer = tf.train.SummaryWriter(
+            summary_writer = tf.summary.FileWriter(
                 self.args.save, flush_secs=10)
         t0 = time.time()
         for i in xrange(self.args.n_steps):
